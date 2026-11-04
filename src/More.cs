@@ -165,7 +165,7 @@ namespace Island
 
             privacyText = UI.Text("", 12, new SolidColorBrush(UI.Orange));
             privacyText.Margin = new Thickness(0, 3, 0, 0); privacyText.Visibility = Visibility.Collapsed;
-            ((Panel)bigDate.Parent).Children.Add(privacyText);
+            clockPanel.Children.Add(privacyText);
 
             var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
             t.Tick += (s, e) => CheckPrivacy();
@@ -261,16 +261,16 @@ namespace Island
             noteEdit.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             noteEdit.ColumnDefinitions.Add(new ColumnDefinition());
             noteEdit.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var back = UI.Pressable(UI.Glyph("", 13, Brushes.White), 34, 34, 17, CloseNote);
-            back.ToolTip = "К списку (Esc)"; back.VerticalAlignment = VerticalAlignment.Top; back.Margin = new Thickness(0, 0, 8, 0);
+            var back = UI.Pressable(UI.Glyph("", 13, UI.Fg), 34, 34, 17, CloseNote);
+            back.ToolTip = L.T("К списку (Esc)"); back.VerticalAlignment = VerticalAlignment.Top; back.Margin = new Thickness(0, 0, 8, 0);
             var del = UI.Pressable(UI.Glyph("", 13, new SolidColorBrush(UI.Red)), 34, 34, 17, () => { if (editing != null) { editing.Text = ""; CloseNote(); } });
-            del.ToolTip = "Удалить заметку"; del.VerticalAlignment = VerticalAlignment.Top; del.Margin = new Thickness(8, 0, 0, 0);
+            del.ToolTip = L.T("Удалить заметку"); del.VerticalAlignment = VerticalAlignment.Top; del.Margin = new Thickness(8, 0, 0, 0);
             Grid.SetColumn(del, 2);
             var card = new Border { CornerRadius = new CornerRadius(14), Background = new SolidColorBrush(UI.Card), Padding = new Thickness(10, 6, 10, 6) };
             Grid.SetColumn(card, 1);
             noteBox = new TextBox
             {
-                Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = Brushes.White, CaretBrush = Brushes.White,
+                Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = UI.Fg, CaretBrush = UI.Fg,
                 FontSize = 13, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
                 SelectionBrush = new SolidColorBrush(UI.Blue)
             };
@@ -324,20 +324,20 @@ namespace Island
         void RenderNotes()
         {
             noteList.Children.Clear();
-            var plus = UI.Pressable(UI.Glyph("", 18, Brushes.White), 64, 64, 16, () => { AddNote(""); OpenNote(notes[0]); });
-            plus.ToolTip = "Новая заметка"; plus.Margin = new Thickness(0, 0, 8, 0);
+            var plus = UI.Pressable(UI.Glyph("", 18, UI.Fg), 64, 64, 16, () => { AddNote(""); OpenNote(notes[0]); });
+            plus.ToolTip = L.T("Новая заметка"); plus.Margin = new Thickness(0, 0, 8, 0);
             noteList.Children.Add(plus);
             foreach (var n in notes)
             {
                 var note = n;
                 var lines = note.Text.Trim().Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
                 var st = new StackPanel { Margin = new Thickness(12, 9, 12, 9) };
-                st.Children.Add(UI.Text(lines.Length > 0 ? lines[0] : "Пустая заметка", 12.5, Brushes.White, FontWeights.SemiBold));
+                st.Children.Add(UI.Text(lines.Length > 0 ? lines[0] : "Пустая заметка", 12.5, UI.Fg, FontWeights.SemiBold));
                 var rest = new TextBlock { Text = string.Join(" ", lines.Skip(1)), Foreground = UI.Gray, FontSize = 11.5, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 30 };
                 st.Children.Add(rest);
                 var card = UI.Pressable(st, 140, 64, 16, () => OpenNote(note));
                 card.Margin = new Thickness(0, 0, 8, 0);
-                card.ToolTip = "Открыть · ПКМ - удалить";
+                card.ToolTip = L.T("Открыть · ПКМ - удалить");
                 card.MouseRightButtonUp += (s, e) => { e.Handled = true; note.Text = ""; SaveNote(note); notes.Remove(note); RenderNotes(); };
                 noteList.Children.Add(card);
             }
@@ -474,16 +474,39 @@ namespace Island
         int pingMs = -1, pingFails;
         bool online = true;
 
+        // A VPN in TUN mode answers ICMP and TCP handshakes itself in a few ms, so those say nothing.
+        // An HTTP request on a kept-alive connection has to cross the tunnel and come back: one real round trip.
         void PingLoop()
         {
-            var p = new Ping();
+            System.Net.ServicePointManager.Expect100Continue = false;
+            var icmp = new Ping();
             while (true)
             {
-                long ms = -1;
-                try { var r = p.Send("1.1.1.1", 1500); if (r.Status == IPStatus.Success) ms = r.RoundtripTime; } catch { }
+                long ms = HttpPing("http://cp.cloudflare.com/generate_204");
+                if (ms < 0) try { var r = icmp.Send("1.1.1.1", 1500); if (r.Status == IPStatus.Success) ms = r.RoundtripTime; } catch { }
                 Dispatcher.BeginInvoke(new Action(() => OnPing((int)ms)));
                 System.Threading.Thread.Sleep(2000);
             }
+        }
+
+        static bool pingWarm;
+
+        static long HttpPing(string url)
+        {
+            try
+            {
+                // the first request also opens the connection, so it is not counted
+                for (int i = pingWarm ? 1 : 0; i < 2; i++)
+                {
+                    var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                    req.KeepAlive = true; req.Timeout = 2500; req.Proxy = null; req.AllowAutoRedirect = false;
+                    var sw = Stopwatch.StartNew();
+                    using (var resp = req.GetResponse()) { }
+                    if (i == 1) { pingWarm = true; return sw.ElapsedMilliseconds; }
+                }
+            }
+            catch { pingWarm = false; }
+            return -1;
         }
 
         void OnPing(int ms)
@@ -495,7 +518,7 @@ namespace Island
                 pingFails = 0;
                 if (!online) { online = true; Notify("", UI.Green, "Интернет вернулся", "Пинг " + ms + " мс", null, 2500); }
             }
-            gPing.Set(ms < 0 ? 0.001 : Math.Min(1, ms / 150.0), ms < 0 ? "-" : ms + "");
+            if (mode == Mode.Expanded) gPing.Set(ms < 0 ? 0.001 : Math.Min(1, ms / 150.0), ms < 0 ? "-" : ms + "");
             gPing.SetColor(ms < 0 ? UI.Red : ms < 60 ? UI.Green : ms < 120 ? UI.Orange : UI.Red);
         }
     }

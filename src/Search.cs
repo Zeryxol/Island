@@ -53,8 +53,8 @@ namespace Island
             var input = new DockPanel { Height = SH, Margin = new Thickness(20, 0, 20, 0) };
             var lens = UI.Glyph("", 16, UI.Gray); lens.Margin = new Thickness(0, 0, 12, 0);
             DockPanel.SetDock(lens, Dock.Left);
-            searchBox = new TextBox { Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = Brushes.White, CaretBrush = Brushes.White, FontSize = 17, VerticalContentAlignment = VerticalAlignment.Center, SelectionBrush = new SolidColorBrush(UI.Blue) };
-            searchHint = UI.Text("Посчитать, перевести единицы, открыть программу…", 17, new SolidColorBrush(Color.FromRgb(99, 99, 102)));
+            searchBox = new TextBox { Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = UI.Fg, CaretBrush = UI.Fg, FontSize = 17, VerticalContentAlignment = VerticalAlignment.Center, SelectionBrush = new SolidColorBrush(UI.Blue) };
+            searchHint = UI.Text("Посчитать, перевести единицы, открыть программу…", 17, new SolidColorBrush(UI.Dim));
             searchHint.IsHitTestVisible = false; searchHint.VerticalAlignment = VerticalAlignment.Center; searchHint.Margin = new Thickness(2, 0, 0, 0);
             var field = new Grid(); field.Children.Add(searchBox); field.Children.Add(searchHint);
             input.Children.Add(lens); input.Children.Add(field);
@@ -62,12 +62,12 @@ namespace Island
 
             resultRow = new Border { Margin = new Thickness(10, 0, 10, 10), Height = 56, CornerRadius = new CornerRadius(16), Background = new SolidColorBrush(UI.Card), Cursor = Cursors.Hand, Opacity = 0 };
             var rr = new DockPanel { Margin = new Thickness(10, 0, 14, 0) };
-            resultIcon = new Border { Width = 36, Height = 36, CornerRadius = new CornerRadius(10), Background = new SolidColorBrush(Color.FromRgb(44, 44, 46)), Margin = new Thickness(0, 0, 12, 0) };
+            resultIcon = new Border { Width = 36, Height = 36, CornerRadius = new CornerRadius(10), Background = new SolidColorBrush(UI.Track), Margin = new Thickness(0, 0, 12, 0) };
             DockPanel.SetDock(resultIcon, Dock.Left);
             var enter = UI.Text("Enter ↵", 12, UI.Gray); enter.VerticalAlignment = VerticalAlignment.Center;
             DockPanel.SetDock(enter, Dock.Right);
             var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            resultTitle = UI.Text("", 15, Brushes.White, FontWeights.SemiBold);
+            resultTitle = UI.Text("", 15, UI.Fg, FontWeights.SemiBold);
             resultSub = UI.Text("", 12, UI.Gray);
             texts.Children.Add(resultTitle); texts.Children.Add(resultSub);
             rr.Children.Add(resultIcon); rr.Children.Add(enter); rr.Children.Add(texts);
@@ -126,11 +126,11 @@ namespace Island
             UI.Ease(pill, HeightProperty, has ? SHR : SH, 260);
             UI.Ease(resultRow, OpacityProperty, has ? 1 : 0, 180);
             if (!has) return;
-            resultTitle.Text = current.Title;
-            resultSub.Text = current.Sub ?? "";
+            resultTitle.Text = L.T(current.Title);
+            resultSub.Text = L.T(current.Sub ?? "");
             resultIcon.Child = current.Icon != null
                 ? (UIElement)new Image { Source = current.Icon, Width = 26, Height = 26 }
-                : UI.Glyph(current.Glyph ?? "", 16, Brushes.White);
+                : UI.Glyph(current.Glyph ?? "", 16, UI.Fg);
         }
 
         void RunResult()
@@ -312,7 +312,7 @@ namespace Island
             DockPanel.SetDock(pickSwatch, Dock.Left);
             var hint = UI.Text("клик - взять · Esc", 11.5, UI.Gray); hint.VerticalAlignment = VerticalAlignment.Center;
             DockPanel.SetDock(hint, Dock.Right);
-            pickHex = UI.Text("", 14, Brushes.White, FontWeights.SemiBold); pickHex.VerticalAlignment = VerticalAlignment.Center;
+            pickHex = UI.Text("", 14, UI.Fg, FontWeights.SemiBold); pickHex.VerticalAlignment = VerticalAlignment.Center;
             pickHex.FontFamily = new FontFamily("Cascadia Mono, Consolas");
             row.Children.Add(pickSwatch); row.Children.Add(hint); row.Children.Add(pickHex);
             layerPick.Children.Add(row);

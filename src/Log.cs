@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace Island
@@ -9,6 +9,7 @@ namespace Island
         public static readonly string File = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Island", "log.txt");
         static readonly object Gate = new object();
 
+        [System.Diagnostics.Conditional("LOGS")]
         public static void Write(string area, string msg)
         {
             try

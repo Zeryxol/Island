@@ -229,10 +229,10 @@ namespace Island
             // and a visible toggle next to the gauges
             dndGlyph = UI.Glyph("", 15, UI.Gray);
             var dndBtn = UI.Pressable(dndGlyph, 38, 38, 19, () => SetDnd(!dnd));
-            dndBtn.ToolTip = "Не беспокоить (или ПКМ по островку)";
+            dndBtn.ToolTip = L.T("Не беспокоить (или ПКМ по островку)");
             dndBtn.VerticalAlignment = VerticalAlignment.Top;
             dndBtn.Margin = new Thickness(0, 6, 18, 0);
-            ((Panel)gCpu.Parent).Children.Insert(0, dndBtn);
+            gaugePanel.Children.Insert(0, dndBtn);
 
             Volume.Get(out lastVol, out lastMute);
             System.Threading.ThreadPool.QueueUserWorkItem(_ => WatchMedia());
@@ -268,12 +268,12 @@ namespace Island
         {
             var g = new Grid { Width = LW, Height = LH, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
             var row = new DockPanel { Margin = new Thickness(18, 0, 18, 0), VerticalAlignment = VerticalAlignment.Center };
-            levelGlyph = UI.Glyph("", 15, Brushes.White); levelGlyph.Width = 22;
-            levelPct = UI.Text("", 12, Brushes.White, FontWeights.SemiBold); levelPct.Width = 34; levelPct.TextAlignment = TextAlignment.Right;
+            levelGlyph = UI.Glyph("", 15, UI.Fg); levelGlyph.Width = 22;
+            levelPct = UI.Text("", 12, UI.Fg, FontWeights.SemiBold); levelPct.Width = 34; levelPct.TextAlignment = TextAlignment.Right;
             DockPanel.SetDock(levelGlyph, Dock.Left); DockPanel.SetDock(levelPct, Dock.Right);
             var track = new Grid { Height = 5, Margin = new Thickness(10, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-            track.Children.Add(new Border { CornerRadius = new CornerRadius(2.5), Background = new SolidColorBrush(Color.FromRgb(58, 58, 60)) });
-            levelFill = new Border { CornerRadius = new CornerRadius(2.5), Background = Brushes.White, HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
+            track.Children.Add(new Border { CornerRadius = new CornerRadius(2.5), Background = new SolidColorBrush(UI.Line) });
+            levelFill = new Border { CornerRadius = new CornerRadius(2.5), Background = UI.Fg, HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
             track.Children.Add(levelFill);
             row.Children.Add(levelGlyph); row.Children.Add(levelPct); row.Children.Add(track);
             g.Children.Add(row);
@@ -298,8 +298,9 @@ namespace Island
             for (int i = 0; i < 4; i++)
             {
                 var sc = new ScaleTransform(1, 0.4);
-                var bar = new Border { Width = 3, Height = 14, Margin = new Thickness(1.5, 0, 0, 0), CornerRadius = new CornerRadius(1.5), Background = new SolidColorBrush(Color.FromRgb(235, 235, 245)), RenderTransform = sc, RenderTransformOrigin = new Point(0.5, 1), VerticalAlignment = VerticalAlignment.Bottom };
-                sc.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.25, 1, TimeSpan.FromMilliseconds(ms[i])) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }, BeginTime = TimeSpan.FromMilliseconds(i * 90) });
+                var bar = new Border { Width = 3, Height = 14, Margin = new Thickness(1.5, 0, 0, 0), CornerRadius = new CornerRadius(1.5), Background = UI.Fg, RenderTransform = sc, RenderTransformOrigin = new Point(0.5, 1), VerticalAlignment = VerticalAlignment.Bottom };
+                int len = ms[i], delay = i * 90;
+                p.IsVisibleChanged += (s, e) => sc.BeginAnimation(ScaleTransform.ScaleYProperty, !p.IsVisible ? null : new DoubleAnimation(0.25, 1, TimeSpan.FromMilliseconds(len)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }, BeginTime = TimeSpan.FromMilliseconds(delay) });
                 p.Children.Add(bar);
             }
             return p;
@@ -311,21 +312,21 @@ namespace Island
         {
             var card = new Border { Width = 262, Height = 64, CornerRadius = new CornerRadius(18), Background = new SolidColorBrush(UI.Card), Margin = new Thickness(0, 0, 14, 0) };
             var g = new DockPanel { Margin = new Thickness(8) };
-            mediaArt = new Border { Width = 48, Height = 48, CornerRadius = new CornerRadius(11), ClipToBounds = true, Background = new SolidColorBrush(Color.FromRgb(44, 44, 46)), Child = UI.Glyph("", 18, UI.Gray), Cursor = Cursors.Hand };
+            mediaArt = new Border { Width = 48, Height = 48, CornerRadius = new CornerRadius(11), ClipToBounds = true, Background = new SolidColorBrush(UI.Track), Child = UI.Glyph("", 18, UI.Gray), Cursor = Cursors.Hand };
             mediaArt.MouseLeftButtonUp += (s, e) => NextSource(1);
             DockPanel.SetDock(mediaArt, Dock.Left);
             var ctrls = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             DockPanel.SetDock(ctrls, Dock.Right);
             Func<string, byte, TextBlock> btn = (glyph, vk) =>
             {
-                var t = UI.Glyph(glyph, 13, Brushes.White);
+                var t = UI.Glyph(glyph, 13, UI.Fg);
                 var b = UI.Pressable(t, 30, 30, 15, () => MediaCommand(vk));
                 ctrls.Children.Add(b);
                 return t;
             };
             btn("", 0xB1); playGlyph = btn("", 0xB3); btn("", 0xB0);
             var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 4, 0) };
-            mediaTitle = UI.Text("Ничего не играет", 13, Brushes.White, FontWeights.SemiBold);
+            mediaTitle = UI.Text("Ничего не играет", 13, UI.Fg, FontWeights.SemiBold);
             mediaArtist = UI.Text("", 11.5, UI.Gray);
             // one dot per sound source; click a dot (or the cover, or scroll) to switch
             mediaDots = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0), Visibility = Visibility.Collapsed };
@@ -364,6 +365,7 @@ namespace Island
             var artCache = new Dictionary<string, KeyValuePair<string, ImageSource>>();
             var heard = new Dictionary<string, MediaSource>();   // sound-only sources, kept a while after they go quiet
             var heardAt = new Dictionary<string, DateTime>();
+            var infoAt = new Dictionary<string, DateTime>();     // window title and exe lookups are slow, redo them every few seconds
             bool first = true;
             while (true)
             {
@@ -402,6 +404,9 @@ namespace Island
                         var name = p.ProcessName.ToLowerInvariant();
                         // already covered by a real session (Edge, Chrome, Spotify...)
                         if (list.Any(x => x.App.ToLowerInvariant().Contains(name) || name.Contains(x.App.ToLowerInvariant().Split('.')[0]))) continue;
+                        DateTime seen;
+                        if (heard.ContainsKey("s:" + name) && infoAt.TryGetValue("s:" + name, out seen) && (now - seen).TotalSeconds < 5) { heardAt["s:" + name] = now; continue; }
+                        infoAt["s:" + name] = now;
                         var win = p.MainWindowHandle != IntPtr.Zero && p.MainWindowTitle.Length > 0 ? p
                             : System.Diagnostics.Process.GetProcessesByName(p.ProcessName).FirstOrDefault(x => x.MainWindowHandle != IntPtr.Zero && x.MainWindowTitle.Length > 0);
                         var title = win != null ? win.MainWindowTitle : p.ProcessName;
@@ -432,7 +437,7 @@ namespace Island
                 var copy = list; bool f = first; var at = polledAt;
                 Dispatcher.BeginInvoke(new Action(() => ShowSources(copy, f, at)));
                 first = false;
-                System.Threading.Thread.Sleep(500);
+                System.Threading.Thread.Sleep(700);
             }
         }
 
@@ -509,7 +514,7 @@ namespace Island
             {
                 var src = s;
                 var dot = new Ellipse { Width = 6, Height = 6, Margin = new Thickness(0, 0, 4, 0), Cursor = Cursors.Hand,
-                    Fill = new SolidColorBrush(src.Key == curKey ? Colors.White : Color.FromRgb(72, 72, 74)), ToolTip = src.App + (src.Playing ? " · играет" : "") };
+                    Fill = new SolidColorBrush(src.Key == curKey ? UI.FgColor : UI.Dim), ToolTip = src.App + (src.Playing ? " · играет" : "") };
                 dot.MouseLeftButtonUp += (a, e) => { userKey = curKey = src.Key; holdUntil = DateTime.Now.AddSeconds(3); RenderMedia(src, false); e.Handled = true; };
                 mediaDots.Children.Add(dot);
             }
@@ -518,7 +523,7 @@ namespace Island
             shownTitleKey = titleKey;
             mTitle = cur == null ? null : cur.Title; mArtist = cur == null ? null : cur.Artist;
             mArt = cur == null ? null : cur.Art ?? (cur.Exe != null ? UI.FileIcon(cur.Exe) : null);
-            mediaTitle.Text = !string.IsNullOrEmpty(mTitle) ? mTitle : "Ничего не играет";
+            mediaTitle.Text = !string.IsNullOrEmpty(mTitle) ? mTitle : L.T("Ничего не играет");
             mediaArtist.Text = mArtist ?? "";
             mediaArt.Child = mArt != null ? (UIElement)new Image { Source = mArt, Stretch = cur.Art != null ? Stretch.UniformToFill : Stretch.Uniform, Margin = new Thickness(cur.Art != null ? 0 : 8) } : UI.Glyph("", 18, UI.Gray);
             if (announce && cur != null && cur.Playing && !dnd && !string.IsNullOrEmpty(mTitle))

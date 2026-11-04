@@ -58,9 +58,9 @@ namespace Island
 
     static class UI
     {
-        public static readonly Brush Gray = Freeze(new SolidColorBrush(Color.FromRgb(142, 142, 147)));
-        public static readonly Color Card = Color.FromRgb(28, 28, 30);
-        public static readonly Color CardHover = Color.FromRgb(50, 50, 53);
+        // theme colors, set once at startup by SetTheme
+        public static Brush Bg, Fg, Gray;
+        public static Color BgColor, FgColor, Card, CardHover, Track, Line, Dim;
         public static readonly Color Blue = Color.FromRgb(10, 132, 255);
         public static readonly Color Orange = Color.FromRgb(255, 159, 10);
         public static readonly Color Green = Color.FromRgb(48, 209, 88);
@@ -69,10 +69,22 @@ namespace Island
         public static readonly FontFamily Icons = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets");
 
         static Brush Freeze(Brush b) { b.Freeze(); return b; }
+        static UI() { SetTheme("dark"); }
+
+        public static void SetTheme(string name)
+        {
+            byte[] v;
+            if (name == "light") v = new byte[] { 246, 246, 248, 20, 20, 22, 110, 110, 116, 228, 228, 233, 212, 212, 218, 216, 216, 222, 200, 200, 207, 180, 180, 188 };
+            else if (name == "gray") v = new byte[] { 46, 46, 50, 255, 255, 255, 163, 163, 170, 62, 62, 67, 80, 80, 86, 72, 72, 78, 88, 88, 95, 104, 104, 111 };
+            else v = new byte[] { 0, 0, 0, 255, 255, 255, 142, 142, 147, 28, 28, 30, 50, 50, 53, 44, 44, 46, 58, 58, 60, 72, 72, 74 };
+            Func<int, Color> c = i => Color.FromRgb(v[i], v[i + 1], v[i + 2]);
+            BgColor = c(0); FgColor = c(3); Card = c(9); CardHover = c(12); Track = c(15); Line = c(18); Dim = c(21);
+            Bg = Freeze(new SolidColorBrush(BgColor)); Fg = Freeze(new SolidColorBrush(FgColor)); Gray = Freeze(new SolidColorBrush(c(6)));
+        }
 
         public static TextBlock Text(string s, double size, Brush fg, FontWeight? w = null)
         {
-            return new TextBlock { Text = s, FontSize = size, Foreground = fg, FontWeight = w ?? FontWeights.Normal, TextTrimming = TextTrimming.CharacterEllipsis };
+            return new TextBlock { Text = L.T(s), FontSize = size, Foreground = fg, FontWeight = w ?? FontWeights.Normal, TextTrimming = TextTrimming.CharacterEllipsis };
         }
 
         public static TextBlock Glyph(string g, double size, Brush fg)
@@ -146,10 +158,10 @@ namespace Island
         {
             var stack = new StackPanel();
             var canvas = new Grid { Width = S, Height = S };
-            canvas.Children.Add(new Ellipse { Width = R * 2 + T, Height = R * 2 + T, Stroke = new SolidColorBrush(Color.FromRgb(44, 44, 46)), StrokeThickness = T });
+            canvas.Children.Add(new Ellipse { Width = R * 2 + T, Height = R * 2 + T, Stroke = new SolidColorBrush(UI.Track), StrokeThickness = T });
             arc = new Path { Stroke = new SolidColorBrush(color), StrokeThickness = T, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
             canvas.Children.Add(arc);
-            value = new TextBlock { Foreground = Brushes.White, FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            value = new TextBlock { Foreground = UI.Fg, FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             canvas.Children.Add(value);
             stack.Children.Add(canvas);
             var cap = UI.Text(caption, 11, UI.Gray); cap.HorizontalAlignment = HorizontalAlignment.Center; cap.Margin = new Thickness(0, 4, 0, 0);
@@ -187,7 +199,9 @@ namespace Island
         Mode mode = Mode.Collapsed;
         bool hovering, dragOut;
 
-        TextBlock miniTime, miniRight, bigTime, bigDate;
+        TextBlock miniTime, miniRight, bigTime, bigDate, weatherLine;
+        StackPanel clockPanel, gaugePanel;
+        string weatherShown;
         Ellipse miniDot;
         Gauge gCpu, gRam, gBat, gPing;
 
@@ -229,7 +243,7 @@ namespace Island
 
             pill = new Border
             {
-                Background = Brushes.Black, Width = CW, Height = CH, CornerRadius = new CornerRadius(CH / 2),
+                Background = UI.Bg, Width = CW, Height = CH, CornerRadius = new CornerRadius(CH / 2),
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(0, 7, 0, 0), ClipToBounds = true, RenderTransform = shake, AllowDrop = true,
                 Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 4, Direction = 270, Opacity = 0.35, Color = Colors.Black }
@@ -248,6 +262,7 @@ namespace Island
             InitSearch(root);
             InitPicker(root);
             InitPlacement();
+            Weather.Start();
             Content = pill;
 
             pill.MouseEnter += (s, e) =>
@@ -269,7 +284,7 @@ namespace Island
             pill.DragLeave += (s, e) => dropLeaveTimer.Start();
             pill.Drop += OnDrop;
 
-            leaveTimer = Timer(380, () => { leaveTimer.Stop(); if (mode == Mode.Expanded && !typing) SetMode(Mode.Collapsed); });
+            leaveTimer = Timer(380, () => { leaveTimer.Stop(); if (mode == Mode.Expanded && !typing && !SettingsOpen) SetMode(Mode.Collapsed); });
             dropLeaveTimer = Timer(150, () => { dropLeaveTimer.Stop(); if (mode == Mode.Drop) SetMode(Mode.Collapsed); });
             noticeTimer = Timer(2200, () => { noticeTimer.Stop(); if (mode == Mode.Notice || mode == Mode.Level || mode == Mode.Call) { callButtons.Visibility = Visibility.Collapsed; noticeTarget = IntPtr.Zero; SetMode(hovering ? Mode.Expanded : Mode.Collapsed); } });
             slow = Timer(1000, () => { UpdateStats(); SlowFeatures(); }); slow.Start();
@@ -314,10 +329,10 @@ namespace Island
         Grid BuildCollapsed()
         {
             var g = new Grid { Margin = new Thickness(16, 0, 14, 0), Height = CH, VerticalAlignment = VerticalAlignment.Top };
-            miniTime = UI.Text("", 13, Brushes.White, FontWeights.SemiBold); miniTime.VerticalAlignment = VerticalAlignment.Center;
+            miniTime = UI.Text("", 13, UI.Fg, FontWeights.SemiBold); miniTime.VerticalAlignment = VerticalAlignment.Center;
             var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             miniDot = new Ellipse { Width = 7, Height = 7, Fill = new SolidColorBrush(UI.Green), Margin = new Thickness(0, 1, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-            miniRight = UI.Text("", 12, Brushes.White, FontWeights.SemiBold);
+            miniRight = UI.Text("", 12, UI.Fg, FontWeights.SemiBold);
             right.Children.Add(miniDot); right.Children.Add(miniRight);
             g.Children.Add(miniTime); g.Children.Add(right);
             return g;
@@ -330,7 +345,7 @@ namespace Island
             noticeIcon = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(20), ClipToBounds = true, Margin = new Thickness(0, 0, 12, 0) };
             DockPanel.SetDock(noticeIcon, Dock.Left);
             var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            noticeTitle = UI.Text("", 14, Brushes.White, FontWeights.SemiBold);
+            noticeTitle = UI.Text("", 14, UI.Fg, FontWeights.SemiBold);
             noticeSub = UI.Text("", 12, UI.Gray);
             texts.Children.Add(noticeTitle); texts.Children.Add(noticeSub);
             row.Children.Add(noticeIcon); row.Children.Add(texts);
@@ -338,18 +353,19 @@ namespace Island
             return g;
         }
 
+        TranslateTransform dropBob;
+
         Grid BuildDrop()
         {
             var g = new Grid { Width = DW, Height = DH, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
             var frame = new Border { Margin = new Thickness(12), CornerRadius = new CornerRadius(22) };
-            var dash = new Rectangle { RadiusX = 22, RadiusY = 22, Stroke = new SolidColorBrush(Color.FromRgb(72, 72, 74)), StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4, 3 } };
+            var dash = new Rectangle { RadiusX = 22, RadiusY = 22, Stroke = new SolidColorBrush(UI.Dim), StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4, 3 } };
             var inner = new Grid(); inner.Children.Add(dash);
             var st = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             var arrow = UI.Glyph("", 22, new SolidColorBrush(UI.Blue));
-            var bob = new TranslateTransform(); arrow.RenderTransform = bob;
-            bob.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-3, 3, TimeSpan.FromMilliseconds(600)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase() });
+            dropBob = new TranslateTransform(); arrow.RenderTransform = dropBob;
             var txt = new StackPanel { Margin = new Thickness(14, 0, 0, 0) };
-            txt.Children.Add(UI.Text("Положить на полку", 15, Brushes.White, FontWeights.SemiBold));
+            txt.Children.Add(UI.Text("Положить на полку", 15, UI.Fg, FontWeights.SemiBold));
             txt.Children.Add(UI.Text("Отпустите файлы или текст", 12, UI.Gray));
             st.Children.Add(arrow); st.Children.Add(txt);
             inner.Children.Add(st);
@@ -367,30 +383,35 @@ namespace Island
             g.RowDefinitions.Add(new RowDefinition());
 
             var clock = new StackPanel();
-            bigTime = UI.Text("", 44, Brushes.White, FontWeights.Light); bigTime.Margin = new Thickness(-2, -8, 0, 0);
+            bigTime = UI.Text("", 44, UI.Fg, FontWeights.Light); bigTime.Margin = new Thickness(-2, -8, 0, 0);
             bigDate = UI.Text("", 14, UI.Gray); bigDate.Margin = new Thickness(0, -2, 0, 0);
-            clock.Children.Add(bigTime); clock.Children.Add(bigDate);
+            weatherLine = new TextBlock { FontSize = 13, Margin = new Thickness(0, 3, 0, 0), Visibility = Visibility.Collapsed };
+            clock.Children.Add(bigTime); clock.Children.Add(bigDate); clock.Children.Add(weatherLine);
+            clockPanel = clock;
             g.Children.Add(clock);
 
-            var gauges = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var gauges = gaugePanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
             gCpu = new Gauge("ЦП", UI.Blue); gRam = new Gauge("ОЗУ", UI.Orange); gBat = new Gauge("Питание", UI.Green);
             gRam.Margin = new Thickness(14, 0, 14, 0);
             gPing = new Gauge("Пинг", UI.Green); gPing.Margin = new Thickness(14, 0, 0, 0);
-            gauges.Children.Add(gCpu); gauges.Children.Add(gRam); gauges.Children.Add(gBat); gauges.Children.Add(gPing);
+            var gaugeById = new Dictionary<string, Gauge> { { "cpu", gCpu }, { "ram", gRam }, { "bat", gBat }, { "ping", gPing } };
+            foreach (var id in Settings.Shown("gauges")) { var ga = gaugeById[id]; ga.Margin = new Thickness(gauges.Children.Count > 0 ? 14 : 0, 0, 0, 0); gauges.Children.Add(ga); }
             g.Children.Add(gauges);
 
             // segmented tabs with sliding indicator
             const double TabW = 96;
-            var tabs = new Grid { Height = 30, Width = TabW * 5 + 6, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 12, 0, 12) };
+            var tabIds = Settings.Shown("tabs");
+            if (tabIds.Count == 0) tabIds.Add("actions");
+            var tabs = new Grid { Height = 30, Width = TabW * tabIds.Count + 6, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 12, 0, 12) };
             tabs.Children.Add(new Border { CornerRadius = new CornerRadius(15), Background = new SolidColorBrush(UI.Card) });
-            tabIndicator = new Border { Width = TabW, Margin = new Thickness(3), CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(58, 58, 60)), HorizontalAlignment = HorizontalAlignment.Left, RenderTransform = new TranslateTransform() };
+            tabIndicator = new Border { Width = TabW, Margin = new Thickness(3), CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(UI.Line), HorizontalAlignment = HorizontalAlignment.Left, RenderTransform = new TranslateTransform() };
             tabs.Children.Add(tabIndicator);
             var labels = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(3, 0, 3, 0) };
-            string[] names = { "Действия", "Буфер", "Полка", "Таймер", "Заметка" };
+            var names = tabIds.Select(id => Settings.Name(id)).ToArray();
             for (int i = 0; i < names.Length; i++)
             {
                 int idx = i;
-                var t = UI.Text(names[i], 12.5, i == 0 ? Brushes.White : UI.Gray, FontWeights.SemiBold);
+                var t = UI.Text(names[i], 12.5, i == 0 ? UI.Fg : UI.Gray, FontWeights.SemiBold);
                 t.HorizontalAlignment = HorizontalAlignment.Center; t.VerticalAlignment = VerticalAlignment.Center;
                 var hit = new Border { Width = TabW, Background = Brushes.Transparent, Cursor = Cursors.Hand, Child = t };
                 hit.MouseLeftButtonUp += (s, e) => SelectTab(idx);
@@ -403,7 +424,9 @@ namespace Island
 
             pageHost = new Grid { ClipToBounds = true };
             Grid.SetRow(pageHost, 2);
-            pages.Add(BuildActions()); pages.Add(BuildClipPage()); pages.Add(BuildShelfPage()); pages.Add(BuildTimerPage()); pages.Add(BuildNotePage());
+            // every page is built so the features behind it keep working; only the chosen ones get a tab
+            var pageById = new Dictionary<string, FrameworkElement> { { "actions", BuildActions() }, { "clip", BuildClipPage() }, { "shelf", BuildShelfPage() }, { "timer", BuildTimerPage() }, { "note", BuildNotePage() } };
+            foreach (var id in tabIds) pages.Add(pageById[id]);
             for (int i = 0; i < pages.Count; i++)
             {
                 pages[i].RenderTransform = new TranslateTransform();
@@ -421,7 +444,7 @@ namespace Island
             int dir = idx > tab ? 1 : -1;
             var oldP = pages[tab]; var newP = pages[idx];
             UI.Ease(tabIndicator.RenderTransform, TranslateTransform.XProperty, idx * 96, 320);
-            tabLabels[tab].Foreground = UI.Gray; tabLabels[idx].Foreground = Brushes.White;
+            tabLabels[tab].Foreground = UI.Gray; tabLabels[idx].Foreground = UI.Fg;
 
             UI.Ease(oldP, OpacityProperty, 0, 160);
             UI.Ease(oldP.RenderTransform, TranslateTransform.XProperty, -30 * dir, 220);
@@ -440,17 +463,24 @@ namespace Island
         FrameworkElement BuildActions()
         {
             var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            bar.Children.Add(BuildMediaCard());
-            Action<string, string, Action> add = (glyph, tip, act) =>
+            var media = BuildMediaCard();
+            Action keepOpen = ShowSettings;
+            Func<string, string, Action, UIElement> make = (glyph, tip, act) =>
             {
-                var b = UI.Pressable(UI.Glyph(glyph, 17, Brushes.White), 46, 46, 23, () => { act(); SetMode(Mode.Collapsed); });
-                b.ToolTip = tip; b.Margin = new Thickness(4, 0, 4, 0);
-                bar.Children.Add(b);
+                var b = UI.Pressable(UI.Glyph(glyph, 17, UI.Fg), 46, 46, 23, () => { act(); if (act != keepOpen) SetMode(Mode.Collapsed); });
+                b.ToolTip = L.T(tip); b.Margin = new Thickness(4, 0, 4, 0);
+                return b;
             };
-            add("\uEF3C", "Пипетка - взять цвет с экрана", () => Dispatcher.BeginInvoke(new Action(StartPicker), DispatcherPriority.Background));
-            add("\uE722", "Скриншот области", () => Process.Start("ms-screenclip:"));
-            add("\uE713", "Параметры", () => Process.Start("ms-settings:"));
-            add("\uE72E", "Заблокировать", () => Native.LockWorkStation());
+            var items = new Dictionary<string, Func<UIElement>>
+            {
+                { "media", () => media },
+                { "picker", () => make("\uEF3C", "Пипетка - взять цвет с экрана", () => Dispatcher.BeginInvoke(new Action(StartPicker), DispatcherPriority.Background)) },
+                { "shot", () => make("\uE722", "Скриншот области", () => Process.Start("ms-screenclip:")) },
+                { "winset", () => make("\uE770", "Параметры Windows", () => Process.Start("ms-settings:")) },
+                { "lock", () => make("\uE72E", "Заблокировать", () => Native.LockWorkStation()) },
+                { "island", () => make("\uE713", "Настройки", keepOpen) },
+            };
+            foreach (var id in Settings.Shown("buttons")) bar.Children.Add(items[id]());
             return bar;
         }
         FrameworkElement BuildClipPage()
@@ -482,7 +512,7 @@ namespace Island
             g.ColumnDefinitions.Add(new ColumnDefinition());
             var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Width = 172 };
             // idle: three editable fields hh:mm:ss with fixed colons; running: the countdown text
-            timerText = UI.Text("", 34, Brushes.White, FontWeights.Light);
+            timerText = UI.Text("", 34, UI.Fg, FontWeights.Light);
             timerText.Visibility = Visibility.Collapsed;
             timerFields = new StackPanel { Orientation = Orientation.Horizontal };
             for (int i = 0; i < 3; i++)
@@ -493,7 +523,7 @@ namespace Island
                 timerFields.Children.Add(box);
             }
             var timeHost = new Grid(); timeHost.Children.Add(timerText); timeHost.Children.Add(timerFields);
-            var track = new Border { Height = 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromRgb(44, 44, 46)), Margin = new Thickness(0, 4, 0, 0) };
+            var track = new Border { Height = 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(UI.Track), Margin = new Thickness(0, 4, 0, 0) };
             timerBar = new Border { Height = 4, Width = 0, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(UI.Orange), HorizontalAlignment = HorizontalAlignment.Left };
             var trackGrid = new Grid { Width = 110, HorizontalAlignment = HorizontalAlignment.Left }; trackGrid.Children.Add(track); trackGrid.Children.Add(timerBar);
             left.Children.Add(timeHost); left.Children.Add(trackGrid);
@@ -502,18 +532,18 @@ namespace Island
             var btns = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(btns, 1);
             var play = UI.Pressable(UI.Glyph("", 14, new SolidColorBrush(UI.Orange)), 40, 40, 20, () => { if (!timerOn) StartTimer(timerDraft); });
-            play.ToolTip = "Запустить выставленное время"; play.Margin = new Thickness(4, 0, 8, 0);
+            play.ToolTip = L.T("Запустить выставленное время"); play.Margin = new Thickness(4, 0, 8, 0);
             btns.Children.Add(play);
             foreach (var m in new[] { 5, 15, 25 })
             {
                 int mins = m;
-                var b = UI.Pressable(UI.Text(mins + " мин", 13, Brushes.White, FontWeights.SemiBold), 64, 40, 20, () => StartTimer(mins));
+                var b = UI.Pressable(UI.Text(mins + " мин", 13, UI.Fg, FontWeights.SemiBold), 64, 40, 20, () => StartTimer(mins));
                 ((TextBlock)b.Child).HorizontalAlignment = HorizontalAlignment.Center; ((TextBlock)b.Child).VerticalAlignment = VerticalAlignment.Center;
                 b.Margin = new Thickness(4, 0, 4, 0);
                 btns.Children.Add(b);
             }
             var stop = UI.Pressable(UI.Glyph("", 14, new SolidColorBrush(UI.Red)), 40, 40, 20, StopTimer);
-            stop.ToolTip = "Сбросить"; stop.Margin = new Thickness(8, 0, 0, 0);
+            stop.ToolTip = L.T("Сбросить"); stop.Margin = new Thickness(8, 0, 0, 0);
             btns.Children.Add(stop);
             g.Children.Add(btns);
             return g;
@@ -525,8 +555,10 @@ namespace Island
         {
             if (m == mode) return;
             var prev = mode; mode = m;
+            dropBob.BeginAnimation(TranslateTransform.YProperty, m != Mode.Drop ? null : new DoubleAnimation(-3, 3, TimeSpan.FromMilliseconds(600)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase() });
+            if (m != Mode.Expanded) HideSettings();
             double w = CW, h = CH; int ms = 380; IEasingFunction ease = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 };
-            if (m == Mode.Expanded) { w = EW; h = EH; ms = 560; ease = new ElasticEase { EasingMode = EasingMode.EaseOut, Oscillations = 1, Springiness = 6 }; }
+            if (m == Mode.Expanded) { UpdateStats(); w = EW; h = EH; ms = 560; ease = new ElasticEase { EasingMode = EasingMode.EaseOut, Oscillations = 1, Springiness = 6 }; }
             if (m == Mode.Notice) { w = NW; h = NH; ms = 520; ease = new ElasticEase { EasingMode = EasingMode.EaseOut, Oscillations = 1, Springiness = 5 }; }
             if (m == Mode.Drop) { w = DW; h = DH; ms = 420; ease = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 }; }
             if (m == Mode.Level) { w = LW; h = LH; ms = 420; ease = new ElasticEase { EasingMode = EasingMode.EaseOut, Oscillations = 1, Springiness = 5 }; }
@@ -566,8 +598,8 @@ namespace Island
             else
                 noticeIcon.Child = UI.Glyph(glyph, 18, new SolidColorBrush(color));
             noticeIcon.Background = new SolidColorBrush(img != null ? UI.Card : Color.FromArgb(46, color.R, color.G, color.B));
-            noticeTitle.Text = title;
-            noticeSub.Text = sub ?? "";
+            noticeTitle.Text = L.T(title);
+            noticeSub.Text = L.T(sub ?? "");
             noticeSub.Visibility = string.IsNullOrEmpty(sub) ? Visibility.Collapsed : Visibility.Visible;
 
             // pop the icon in
@@ -763,7 +795,7 @@ namespace Island
                     inner = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Margin = new Thickness(6), Child = new Image { Source = item.Image, Stretch = Stretch.UniformToFill } };
                 else
                 {
-                    var tb = new TextBlock { Text = item.Text.Trim(), Foreground = Brushes.White, FontSize = 12, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(12, 9, 12, 9) };
+                    var tb = new TextBlock { Text = item.Text.Trim(), Foreground = UI.Fg, FontSize = 12, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(12, 9, 12, 9) };
                     inner = tb;
                 }
                 var card = UI.Pressable(inner, 132, 76, 16, () =>
@@ -774,7 +806,7 @@ namespace Island
                     clips.Remove(item); clips.Insert(0, item); RenderClips(); SaveClips();
                     Flash("Снова в буфере");
                 });
-                card.ToolTip = "Нажмите, чтобы скопировать снова";
+                card.ToolTip = L.T("Нажмите, чтобы скопировать снова");
                 card.Margin = new Thickness(0, 0, 8, 0);
                 card.MouseRightButtonUp += (s, e) => { e.Handled = true; clips.Remove(item); DeleteClipFile(item); RenderClips(); SaveClips(); };
                 clipList.Children.Add(card);
@@ -789,8 +821,8 @@ namespace Island
         {
             if (flashBadge == null)
             {
-                flashBadge = new Border { Background = new SolidColorBrush(Color.FromRgb(58, 58, 60)), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 4, 12, 4), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -42, 0, 0), Opacity = 0, IsHitTestVisible = false };
-                flashBadge.Child = UI.Text("", 12, Brushes.White, FontWeights.SemiBold);
+                flashBadge = new Border { Background = new SolidColorBrush(UI.Line), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 4, 12, 4), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -42, 0, 0), Opacity = 0, IsHitTestVisible = false };
+                flashBadge.Child = UI.Text("", 12, UI.Fg, FontWeights.SemiBold);
                 pageHost.Children.Add(flashBadge);
                 pageHost.ClipToBounds = false;
                 flashTimer = Timer(1100, () => { flashTimer.Stop(); UI.Ease(flashBadge, OpacityProperty, 0, 250); });
@@ -845,7 +877,7 @@ namespace Island
                 var icon = item.Path != null && !isDir ? UI.FileIcon(item.Path) : null;
                 if (icon != null) st.Children.Add(new Image { Source = icon, Width = 32, Height = 32, Stretch = Stretch.Uniform });
                 else st.Children.Add(UI.Glyph(isDir ? "" : item.Text != null ? "" : "", 24, new SolidColorBrush(isDir ? Color.FromRgb(255, 204, 0) : UI.Purple)));
-                var name = UI.Text(item.Path != null ? System.IO.Path.GetFileName(item.Path.TrimEnd('\\')) : item.Text.Trim(), 11, Brushes.White);
+                var name = UI.Text(item.Path != null ? System.IO.Path.GetFileName(item.Path.TrimEnd('\\')) : item.Text.Trim(), 11, UI.Fg);
                 name.HorizontalAlignment = HorizontalAlignment.Center; name.Margin = new Thickness(0, 5, 0, 0);
                 st.Children.Add(name);
 
@@ -894,7 +926,7 @@ namespace Island
         {
             var b = new TextBox
             {
-                Width = 46, MaxLength = 2, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = Brushes.White, CaretBrush = Brushes.White,
+                Width = 46, MaxLength = 2, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = UI.Fg, CaretBrush = UI.Fg,
                 FontSize = 34, FontWeight = FontWeights.Light, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Center,
                 SelectionBrush = new SolidColorBrush(UI.Orange), Cursor = Cursors.IBeam, ToolTip = idx == 0 ? "Часы" : idx == 1 ? "Минуты" : "Секунды"
             };
@@ -1047,7 +1079,7 @@ namespace Island
             {
                 timerText.Visibility = Visibility.Collapsed; timerFields.Visibility = Visibility.Visible;
                 FieldsFromDraft(); timerBar.Width = 0;
-                miniRight.Foreground = Brushes.White;
+                miniRight.Foreground = UI.Fg;
             }
 
             bool caps = (Native.GetKeyState(0x14) & 1) != 0;
@@ -1064,36 +1096,53 @@ namespace Island
         void UpdateStats()
         {
             var now = DateTime.Now;
-            miniTime.Text = now.ToString("HH:mm");
-            bigTime.Text = now.ToString("HH:mm");
-            var date = now.ToString("dddd, d MMMM", Ru);
+            var fmt = (Settings.Clock24 ? "HH:mm" : "h:mm") + (Settings.Seconds ? ":ss" : "") + (Settings.Clock24 ? "" : " tt");
+            miniTime.Text = now.ToString(fmt, CultureInfo.InvariantCulture);
+            bigTime.Text = now.ToString(fmt, CultureInfo.InvariantCulture);
+            var date = Settings.English ? now.ToString("dddd, MMMM d", CultureInfo.InvariantCulture) : now.ToString("dddd, d MMMM", Ru);
             bigDate.Text = char.ToUpper(date[0]) + date.Substring(1);
+            if (Weather.Text != weatherShown)
+            {
+                weatherShown = Weather.Text;
+                weatherLine.Inlines.Clear();
+                weatherLine.Inlines.Add(new System.Windows.Documents.Run(Weather.Short) { Foreground = UI.Fg, FontWeight = FontWeights.SemiBold });
+                weatherLine.Inlines.Add(new System.Windows.Documents.Run("  " + Weather.Text) { Foreground = UI.Gray });
+                weatherLine.ToolTip = Weather.Place;
+                weatherLine.Visibility = Visibility.Visible;
+            }
 
             long i, k, u;
             Native.GetSystemTimes(out i, out k, out u);
             long total = (k - lKernel) + (u - lUser);
             double cpu = total > 0 ? 1 - (double)(i - lIdle) / total : 0;
             lIdle = i; lKernel = k; lUser = u;
-            gCpu.Set(cpu, Math.Round(cpu * 100) + "%");
+            bool open = mode == Mode.Expanded;
+            if (open) gCpu.Set(cpu, Math.Round(cpu * 100) + "%");
 
             var m = new Native.MEMSTATUS();
             Native.GlobalMemoryStatusEx(m);
-            gRam.Set(m.dwMemoryLoad / 100.0, m.dwMemoryLoad + "%");
+            if (open) gRam.Set(m.dwMemoryLoad / 100.0, m.dwMemoryLoad + "%");
+            if (open) gPing.Set(pingMs < 0 ? 0.001 : Math.Min(1, pingMs / 150.0), pingMs < 0 ? "-" : pingMs + "");
 
             var ps = WF.SystemInformation.PowerStatus;
             bool noBattery = (ps.BatteryChargeStatus & WF.BatteryChargeStatus.NoSystemBattery) != 0 || ps.BatteryLifePercent > 1;
             bool ac = ps.PowerLineStatus == WF.PowerLineStatus.Online;
             int pct = (int)Math.Round(ps.BatteryLifePercent * 100);
             // on a desktop the battery ring says nothing; ping takes its place
-            gBat.Visibility = noBattery ? Visibility.Collapsed : Visibility.Visible;
+            gBat.Visibility = noBattery || !Settings.Shown("gauges").Contains("bat") ? Visibility.Collapsed : Visibility.Visible;
             if (noBattery) gBat.Set(1, "AC");
-            else gBat.Set(ps.BatteryLifePercent, pct + "%");
+            else if (open) gBat.Set(ps.BatteryLifePercent, pct + "%");
             if (!timerOn)
             {
                 // a desktop has no battery to show, so the right side shows ping instead (no dot)
-                miniRight.Text = noBattery ? (pingMs < 0 ? "-" : pingMs + " мс") : pct + "%";
-                miniDot.Visibility = noBattery ? Visibility.Collapsed : Visibility.Visible;
-                miniDot.Fill = new SolidColorBrush(!noBattery && pct <= 20 && !ac ? UI.Red : UI.Green);
+                var what = Settings.PillRight;
+                if (what == "auto") what = noBattery ? "ping" : "battery";
+                if (what == "battery" && noBattery) what = "none";
+                if (what == "weather" && Weather.Short == null) what = "none";
+                miniRight.Text = what == "battery" ? pct + "%" : what == "ping" ? (pingMs < 0 ? "-" : pingMs + L.T(" мс")) : what == "weather" ? Weather.Short : "";
+                miniDot.Visibility = what == "battery" ? Visibility.Visible : Visibility.Collapsed;
+                var dot = !noBattery && pct <= 20 && !ac ? UI.Red : UI.Green;
+                if (((SolidColorBrush)miniDot.Fill).Color != dot) miniDot.Fill = new SolidColorBrush(dot);
             }
             if (!noBattery && powerKnown && ac != lastAc)
                 Notify(ac ? "" : "", ac ? UI.Green : UI.Orange, ac ? "Зарядка подключена" : "Работа от батареи", "Заряд " + pct + "%");
@@ -1108,11 +1157,18 @@ namespace Island
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             bool created;
             var mutex = new System.Threading.Mutex(true, "IslandApp_SingleInstance", out created);
-            if (!created) return;
+            if (!created)
+            {
+                // after saving settings the old copy is still closing; wait for it
+                if (!args.Contains("--restart")) return;
+                try { if (!mutex.WaitOne(10000)) return; } catch (System.Threading.AbandonedMutexException) { }
+            }
+            Settings.Load();
+            UI.SetTheme(Settings.Theme);
 
             string winVer = "?";
             try { using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion")) winVer = k.GetValue("ProductName") + " " + k.GetValue("DisplayVersion") + " (сборка " + k.GetValue("CurrentBuild") + ")"; } catch { }
@@ -1130,23 +1186,19 @@ namespace Island
                 Visible = true
             };
             var menu = new WF.ContextMenuStrip();
-            var hide = new WF.ToolStripMenuItem("Скрыть островок   Ctrl+Alt+I");
+            var hide = new WF.ToolStripMenuItem(L.T("Скрыть островок") + "   Ctrl+Alt+I");
             hide.Click += (s, e) => win.ToggleHidden();
-            IslandWindow.VisibilityChanged = shown => hide.Text = (shown ? "Скрыть островок" : "Показать островок") + "   Ctrl+Alt+I";
+            IslandWindow.VisibilityChanged = shown => hide.Text = L.T(shown ? "Скрыть островок" : "Показать островок") + "   Ctrl+Alt+I";
             tray.MouseDoubleClick += (s, e) => { if (e.Button == WF.MouseButtons.Left) win.ToggleHidden(); };
             menu.Items.Add(hide);
-            menu.Items.Add("Вернуть наверх по центру", null, (s, e) => win.ResetPosition());
+            menu.Items.Add(L.T("Настройки"), null, (s, e) => win.ShowSettings());
+            menu.Items.Add(L.T("Вернуть наверх по центру"), null, (s, e) => win.ResetPosition());
             menu.Items.Add(new WF.ToolStripSeparator());
-            var auto = new WF.ToolStripMenuItem("Запускать с Windows") { Checked = IsAutostart() };
+            var auto = new WF.ToolStripMenuItem(L.T("Запускать с Windows")) { Checked = IsAutostart() };
             auto.Click += (s, e) => { SetAutostart(!auto.Checked); auto.Checked = IsAutostart(); };
             menu.Items.Add(auto);
-            menu.Items.Add("Открыть логи", null, (s, e) =>
-            {
-                Log.Write("start", "логи открыты из трея");
-                Log.Reveal(Log.File);
-            });
             menu.Items.Add(new WF.ToolStripSeparator());
-            menu.Items.Add("Выход", null, (s, e) => { tray.Visible = false; app.Shutdown(); });
+            menu.Items.Add(L.T("Выход"), null, (s, e) => { tray.Visible = false; app.Shutdown(); });
             tray.ContextMenuStrip = menu;
 
             app.Run();
