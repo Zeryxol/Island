@@ -1,6 +1,6 @@
 # .\build.ps1                 -> bin\Island.exe
 # .\build.ps1 -Version 1.2.0  -> same, with the version stamped into the exe
-param([string]$Version = '1.0.0')
+param([string]$Version = '1.2.0')
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 Add-Type -AssemblyName System.Drawing
@@ -50,6 +50,7 @@ $wm = 'C:\Windows\System32\WinMetadata'
     /r:"$fw\System.Xaml.dll" /r:"$fw\System.Runtime.WindowsRuntime.dll" /r:"$fw\System.Runtime.dll" `
     /r:$wm\Windows.UI.winmd /r:$wm\Windows.Foundation.winmd /r:$wm\Windows.ApplicationModel.winmd `
     /r:$wm\Windows.Media.winmd /r:$wm\Windows.Storage.winmd /r:System.Windows.Forms.dll /r:System.Drawing.dll `
+    /r:System.Web.Extensions.dll /r:System.Management.dll /r:"$fw\WPF\UIAutomationClient.dll" /r:"$fw\WPF\UIAutomationTypes.dll" `
     obj\AssemblyInfo.cs src\*.cs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "bin\Island.exe $Version"

@@ -114,6 +114,11 @@ namespace Island
         {
             wheelProc = (code, w, l) =>
             {
+                if (code >= 0 && w.ToInt32() == 0x0202 && Settings.Get("translator") == "1" && Settings.Get("translateAuto") == "1")
+                {
+                    var click = (MSLL)Marshal.PtrToStructure(l, typeof(MSLL));
+                    Dispatcher.BeginInvoke(new Action(() => SelectionMouseUp(click.X, click.Y)));
+                }
                 if (code >= 0 && w.ToInt32() == 0x020A && pill.IsHitTestVisible && !typing)
                 {
                     var info = (MSLL)Marshal.PtrToStructure(l, typeof(MSLL));                    try

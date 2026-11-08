@@ -569,11 +569,11 @@ namespace Island
             }
 
             // timer > music > battery on the right side of the closed island
-            bool showEq = mPlaying && !timerOn;
+            bool showEq = mode == Mode.Collapsed && mPlaying && !timerOn && !fullscreen && !hidden;
             eq.Visibility = showEq ? Visibility.Visible : Visibility.Collapsed;
             ((FrameworkElement)miniRight.Parent).Visibility = showEq ? Visibility.Collapsed : Visibility.Visible;
 
-            bool fs = IsFullscreen();
+            bool fs = !translationVisible && IsFullscreen();
             if (fs != fullscreen)
             {
                 fullscreen = fs;

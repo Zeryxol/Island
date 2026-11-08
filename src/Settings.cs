@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -27,9 +27,12 @@ namespace Island
         {
             { "theme", "dark" }, { "lang", "ru" }, { "clock24", "1" }, { "seconds", "0" },
             { "weather", "1" }, { "city", "" }, { "pill", "auto" },
-            { "tabs", "actions,clip,shelf,timer,note" },
-            { "buttons", "media,picker,shot,island,lock,-winset" },
-            { "gauges", "cpu,ram,bat,ping" },
+            { "tabs", "actions,clip,shelf,timer,note,monitor" },
+            { "buttons", "media,picker,shot,island,lock,-winset,-translate" },
+            { "gauges", "cpu,ram,bat,ping,-gpu,-temp,-net" },
+            { "monitorItems", "cpu,ram,gpu,temp,net" },
+            { "monitoring", "1" }, { "updates", "1" },
+            { "translator", "1" }, { "translateAuto", "0" }, { "translateTarget", "auto" },
         };
 
         static readonly Dictionary<string, string> Names = new Dictionary<string, string>
@@ -37,6 +40,8 @@ namespace Island
             { "actions", "Действия" }, { "clip", "Буфер" }, { "shelf", "Полка" }, { "timer", "Таймер" }, { "note", "Заметка" },
             { "media", "Плеер" }, { "picker", "Пипетка" }, { "shot", "Скриншот" }, { "winset", "Параметры Windows" }, { "lock", "Блокировка" }, { "island", "Настройки" },
             { "cpu", "ЦП" }, { "ram", "ОЗУ" }, { "bat", "Питание" }, { "ping", "Пинг" },
+            { "gpu", "GPU" }, { "temp", "Температура" }, { "net", "Сеть" },
+            { "monitor", "Система" }, { "translate", "Переводчик" },
         };
 
         public static string Name(string id) { string n; return Names.TryGetValue(id, out n) ? n : id; }
@@ -110,6 +115,31 @@ namespace Island
     {
         static readonly Dictionary<string, string> En = new Dictionary<string, string>
         {
+            { "Система", "System" }, { "Сеть", "Network" }, { "Температура", "Temperature" }, { "Переводчик", "Translator" },
+            { "Читаем выделение…", "Reading selection…" },
+            { "Активное окно изменилось. Выделите текст и повторите Ctrl+Alt+T.", "The active window changed. Select text and press Ctrl+Alt+T again." },
+            { "Приложение не отвечает на запрос выделения. Скопируйте текст и нажмите «Перевести буфер».", "The app did not respond to the selection request. Copy the text, then click Translate clipboard." },
+            { "Ctrl+Alt+T занято другой программой", "Ctrl+Alt+T is already used by another app" },
+            { "Системный мониторинг", "System monitoring" }, { "Показатели на вкладке «Система»", "Metrics in the System tab" },
+            { "Переводить при выделении", "Translate on selection" }, { "Язык перевода", "Target language" },
+            { "Обновления", "Updates" }, { "Автообновления", "Automatic updates" }, { "Проверить сейчас", "Check now" },
+            { "Перезапустить и обновить", "Restart and update" }, { "Обновление готово", "Update ready" },
+            { "Нажмите, чтобы перезапустить Island", "Click to restart Island" }, { "Обновления ещё не проверялись", "Updates have not been checked yet" },
+            { "Проверка уже идёт…", "Already checking…" }, { "Проверяем обновления…", "Checking for updates…" },
+            { "Установлена последняя версия", "Island is up to date" }, { "Не удалось проверить обновления. Попробуйте позже.", "Could not check for updates. Try again later." },
+            { "Сначала проверьте обновления", "Check for updates first" }, { "Не удалось установить обновление. Проверьте доступ к папке приложения.", "Could not install the update. Check access to the app folder." },
+            { "Выберите показатели в настройках", "Choose metrics in settings" }, { "Мониторинг выключен в настройках", "Monitoring is disabled in settings" },
+            { "Самый загруженный движок GPU · Windows WDDM", "Busiest GPU engine · Windows WDDM" },
+            { "Датчик недоступен. Поддерживаются NVIDIA GPU и датчики запущенного LibreHardwareMonitor / OpenHardwareMonitor.", "Sensor unavailable. Supports NVIDIA GPUs and sensors from running LibreHardwareMonitor / OpenHardwareMonitor." },
+            { "Слишком длинный символ в выделении", "A text element is too long" }, { "Сервис не вернул перевод", "The service returned no translation" },
+            { "Сервис перевода недоступен или исчерпан дневной лимит. Попробуйте позже.", "Translation is unavailable or the daily quota is exhausted. Try again later." },
+            { "Не удалось прочитать выделение. Скопируйте текст и нажмите «Перевести буфер».", "Could not read the selection. Copy the text, then click Translate clipboard." },
+            { "Переводчик выключен в настройках", "Translator is disabled in settings" }, { "Сначала скопируйте текст", "Copy some text first" },
+            { "Буфер обмена занят. Попробуйте ещё раз.", "Clipboard is busy. Try again." }, { "Выделите не более 4000 символов", "Select at most 4000 characters" },
+            { "Переводим…", "Translating…" }, { "Нет связи с сервисом перевода. Проверьте интернет и попробуйте ещё раз.", "Could not reach the translation service. Check your connection and try again." },
+            { "Не удалось перевести текст", "Could not translate the text" }, { "Скопировать", "Copy" }, { "Перевести буфер", "Translate clipboard" },
+            { "Русский", "Russian" }, { "Вкладки", "Tabs" },
+            { "Выделите текст и нажмите Ctrl+Alt+T. Текст отправляется в Google Translate только по команде или при включённом переводе выделения. Нужен интернет.", "Select text and press Ctrl+Alt+T. Text is sent to Google Translate only on request, or when selection translation is enabled. Internet access is required." },
             { "Действия", "Actions" }, { "Буфер", "Clipboard" }, { "Полка", "Shelf" }, { "Таймер", "Timer" }, { "Заметка", "Notes" },
             { "Плеер", "Player" }, { "Пипетка", "Color picker" }, { "Скриншот", "Screenshot" }, { "Параметры Windows", "Windows settings" },
             { "Блокировка", "Lock" }, { "Настройки островка", "Island settings" }, { "ЦП", "CPU" }, { "ОЗУ", "RAM" }, { "Питание", "Power" }, { "Пинг", "Ping" },
@@ -257,6 +287,8 @@ namespace Island
 
         public void ShowSettings()
         {
+            selectionRequest++; selectionBusy = false;
+            translationVisible = false; translationRequest++;
             if (settingsHost == null)
             {
                 settingsHost = new Grid { Background = UI.Bg, Visibility = Visibility.Collapsed, RenderTransform = new TranslateTransform() };
@@ -274,6 +306,8 @@ namespace Island
 
         void HideSettings()
         {
+            selectionRequest++; selectionBusy = false;
+            translationVisible = false; translationRequest++;
             if (settingsHost == null || settingsHost.Visibility != Visibility.Visible) return;
             settingsHost.Visibility = Visibility.Collapsed;
             settingsHost.Children.Clear();
@@ -318,11 +352,16 @@ namespace Island
                 Page("Вкладки", p => p.Children.Add(Order("tabs"))),
                 Page("Кнопки", p => p.Children.Add(Order("buttons"))),
                 Page("Показатели", p => p.Children.Add(Order("gauges"))),
+                Page("Система", p => { p.Children.Add(Toggle("monitoring", "Системный мониторинг")); Label(p, "Показатели на вкладке «Система»"); p.Children.Add(Order("monitorItems")); }),
+                Page("Переводчик", p => { p.Children.Add(Toggle("translator", "Переводчик")); p.Children.Add(Toggle("translateAuto", "Переводить при выделении")); Label(p, "Язык перевода"); p.Children.Add(Choice("translateTarget", new[] { "auto", "RU ↔ EN", "ru", "Русский", "en", "English" })); Hint(p, "Выделите текст и нажмите Ctrl+Alt+T. Текст отправляется в Google Translate только по команде или при включённом переводе выделения. Нужен интернет."); }),
+                Page("Обновления", p => { p.Children.Add(Toggle("updates", "Автообновления")); Hint(p, "Island " + Updates.Current + (Settings.English ? ". Checks at startup and every 6 hours. Updates download in the background; click the notification to restart." : ". Проверка при запуске и каждые 6 часов. Новая версия загружается в фоне; нажмите уведомление, чтобы перезапустить островок.")); var status = UI.Text(Updates.Status, 12, UI.Gray); status.TextWrapping = TextWrapping.Wrap; status.Margin = new Thickness(2, 8, 0, 8); p.Children.Add(status); var check = UI.Pressable(Centered(UI.Text("Проверить сейчас", 12, UI.Fg)), 170, 30, 15, () => Updates.Check(true, text => status.Text = text)); p.Children.Add(check); var install = UI.Pressable(Centered(UI.Text("Перезапустить и обновить", 12, UI.Fg)), 220, 30, 15, () => { Updates.Install(); status.Text = Updates.Status; }); install.Margin = new Thickness(0, 8, 0, 0); p.Children.Add(install); }),
             };
 
             var nav = new StackPanel { Width = 118, Margin = new Thickness(0, 0, 14, 0) };
             DockPanel.SetDock(nav, Dock.Left);
-            Children.Add(nav);
+            var navScroll = new ScrollViewer { Content = nav, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden };
+            DockPanel.SetDock(navScroll, Dock.Left);
+            Children.Add(navScroll);
             var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden };
             Children.Add(body);
 
@@ -364,6 +403,12 @@ namespace Island
             var t = UI.Text(text, 12, UI.Gray, FontWeights.SemiBold);
             t.Margin = new Thickness(2, p.Children.Count == 0 ? 0 : 12, 0, 6);
             p.Children.Add(t);
+        }
+
+        static void Hint(Panel p, string text)
+        {
+            var t = UI.Text(text, 11.5, UI.Gray); t.TextWrapping = TextWrapping.Wrap;
+            t.Margin = new Thickness(2, 10, 0, 2); p.Children.Add(t);
         }
 
         // "Save" lights up once something changed

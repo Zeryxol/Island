@@ -262,6 +262,7 @@ namespace Island
             InitSearch(root);
             InitPicker(root);
             InitPlacement();
+            InitExtras();
             Weather.Start();
             Content = pill;
 
@@ -394,14 +395,15 @@ namespace Island
             gCpu = new Gauge("ЦП", UI.Blue); gRam = new Gauge("ОЗУ", UI.Orange); gBat = new Gauge("Питание", UI.Green);
             gRam.Margin = new Thickness(14, 0, 14, 0);
             gPing = new Gauge("Пинг", UI.Green); gPing.Margin = new Thickness(14, 0, 0, 0);
-            var gaugeById = new Dictionary<string, Gauge> { { "cpu", gCpu }, { "ram", gRam }, { "bat", gBat }, { "ping", gPing } };
+            gGpu = new Gauge("GPU", UI.Blue); gTemp = new Gauge("Температура", UI.Orange); gNet = new Gauge("Сеть", UI.Green);
+            var gaugeById = new Dictionary<string, Gauge> { { "cpu", gCpu }, { "ram", gRam }, { "bat", gBat }, { "ping", gPing }, { "gpu", gGpu }, { "temp", gTemp }, { "net", gNet } };
             foreach (var id in Settings.Shown("gauges")) { var ga = gaugeById[id]; ga.Margin = new Thickness(gauges.Children.Count > 0 ? 14 : 0, 0, 0, 0); gauges.Children.Add(ga); }
-            g.Children.Add(gauges);
+            g.Children.Add(new Viewbox { Child = gauges, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, MaxWidth = 284, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top });
 
             // segmented tabs with sliding indicator
-            const double TabW = 96;
             var tabIds = Settings.Shown("tabs");
             if (tabIds.Count == 0) tabIds.Add("actions");
+            double TabW = tabWidth = Math.Min(96, (EW - 58) / tabIds.Count);
             var tabs = new Grid { Height = 30, Width = TabW * tabIds.Count + 6, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 12, 0, 12) };
             tabs.Children.Add(new Border { CornerRadius = new CornerRadius(15), Background = new SolidColorBrush(UI.Card) });
             tabIndicator = new Border { Width = TabW, Margin = new Thickness(3), CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(UI.Line), HorizontalAlignment = HorizontalAlignment.Left, RenderTransform = new TranslateTransform() };
@@ -425,7 +427,7 @@ namespace Island
             pageHost = new Grid { ClipToBounds = true };
             Grid.SetRow(pageHost, 2);
             // every page is built so the features behind it keep working; only the chosen ones get a tab
-            var pageById = new Dictionary<string, FrameworkElement> { { "actions", BuildActions() }, { "clip", BuildClipPage() }, { "shelf", BuildShelfPage() }, { "timer", BuildTimerPage() }, { "note", BuildNotePage() } };
+            var pageById = new Dictionary<string, FrameworkElement> { { "actions", BuildActions() }, { "clip", BuildClipPage() }, { "shelf", BuildShelfPage() }, { "timer", BuildTimerPage() }, { "note", BuildNotePage() }, { "monitor", BuildMonitorPage() } };
             foreach (var id in tabIds) pages.Add(pageById[id]);
             for (int i = 0; i < pages.Count; i++)
             {
@@ -443,7 +445,7 @@ namespace Island
             if (idx == tab) return;
             int dir = idx > tab ? 1 : -1;
             var oldP = pages[tab]; var newP = pages[idx];
-            UI.Ease(tabIndicator.RenderTransform, TranslateTransform.XProperty, idx * 96, 320);
+            UI.Ease(tabIndicator.RenderTransform, TranslateTransform.XProperty, idx * tabWidth, 320);
             tabLabels[tab].Foreground = UI.Gray; tabLabels[idx].Foreground = UI.Fg;
 
             UI.Ease(oldP, OpacityProperty, 0, 160);
@@ -479,9 +481,10 @@ namespace Island
                 { "winset", () => make("\uE770", "Параметры Windows", () => Process.Start("ms-settings:")) },
                 { "lock", () => make("\uE72E", "Заблокировать", () => Native.LockWorkStation()) },
                 { "island", () => make("\uE713", "Настройки", keepOpen) },
+                { "translate", () => make("\uE8C1", "Переводчик", () => Dispatcher.BeginInvoke(new Action(TranslateClipboard))) },
             };
             foreach (var id in Settings.Shown("buttons")) bar.Children.Add(items[id]());
-            return bar;
+            return new Viewbox { Child = bar, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly };
         }
         FrameworkElement BuildClipPage()
         {
@@ -1122,6 +1125,7 @@ namespace Island
             var m = new Native.MEMSTATUS();
             Native.GlobalMemoryStatusEx(m);
             if (open) gRam.Set(m.dwMemoryLoad / 100.0, m.dwMemoryLoad + "%");
+            UpdateMonitor(cpu, m.dwMemoryLoad, m.ullTotalPhys - m.ullAvailPhys, m.ullTotalPhys);
             if (open) gPing.Set(pingMs < 0 ? 0.001 : Math.Min(1, pingMs / 150.0), pingMs < 0 ? "-" : pingMs + "");
 
             var ps = WF.SystemInformation.PowerStatus;
